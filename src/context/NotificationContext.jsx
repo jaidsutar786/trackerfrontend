@@ -120,14 +120,22 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [user]);
 
-  // Setup WebSocket connection
+  // Setup WebSocket connection (disabled on Render free tier)
   useEffect(() => {
     if (!user) return;
 
     const token = sessionStorage.getItem('access_token');
     if (!token) return;
 
-    // Connect to WebSocket
+    // Check if we're on production (Render)
+    const isProduction = window.location.hostname.includes('onrender.com');
+    
+    if (isProduction) {
+      console.log('⚠️ WebSocket disabled on Render free tier - using polling instead');
+      return; // Skip WebSocket on production
+    }
+
+    // Connect to WebSocket (local development only)
     websocketService.connect(token);
 
     // Listen for incoming notifications
@@ -354,6 +362,23 @@ export const NotificationProvider = ({ children }) => {
       websocketService.removeListener(handleNotification);
       websocketService.disconnect();
     };
+  }, [user]);
+
+  // Setup polling for notifications (production fallback)
+  useEffect(() => {
+    if (!user) return;
+
+    const isProduction = window.location.hostname.includes('onrender.com');
+    if (!isProduction) return; // Only poll on production
+
+    console.log('📡 Starting notification polling (production mode)');
+    
+    // Poll every 5 seconds
+    const pollInterval = setInterval(() => {
+      fetchNotifications();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
   }, [user]);
 
   // Request browser notification permission
