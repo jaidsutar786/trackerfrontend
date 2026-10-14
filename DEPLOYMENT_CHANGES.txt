@@ -1,0 +1,197 @@
+================================================================
+   TEOPLE — PRODUCTION DEPLOYMENT CHANGES CHECKLIST
+   (Jab Static IP / Domain milega tab ye sab change karna hai)
+================================================================
+
+Maan lo tumhara:
+  Domain     : https://teople.com          (ya IP: http://203.0.113.10)
+  Backend    : https://api.teople.com      (ya http://203.0.113.10:8000)
+  Frontend   : https://teople.com          (ya http://203.0.113.10)
+
+----------------------------------------------------------------
+1. BACKEND — backend/.env
+----------------------------------------------------------------
+
+PURANA:
+  SECRET_KEY=django-insecure-v_pqs...      ← ZAROOR BADLO (insecure hai)
+  DEBUG=True                               ← ZAROOR BADLO
+  ALLOWED_HOSTS=localhost,127.0.0.1        ← ZAROOR BADLO
+  FRONTEND_URL=http://localhost:5173       ← ZAROOR BADLO
+  CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174  ← ZAROOR BADLO
+  DB_HOST=localhost                        ← agar DB alag server pe ho tab badlo
+  DB_PASSWORD=teople@123                   ← production me strong password rakho
+
+NAYA:
+  SECRET_KEY=<naya-random-50-char-key>     ← https://djecrety.ir se generate karo
+  DEBUG=False
+  ALLOWED_HOSTS=teople.com,www.teople.com,203.0.113.10
+  FRONTEND_URL=https://teople.com
+  CORS_ALLOWED_ORIGINS=https://teople.com,https://www.teople.com
+  DB_HOST=localhost                        ← same server pe hai toh localhost hi rahega
+  DB_PASSWORD=<strong-password>
+
+----------------------------------------------------------------
+2. BACKEND — core/settings.py
+----------------------------------------------------------------
+
+PURANA:
+  CHANNEL_LAYERS = {
+      'default': {
+          'BACKEND': 'channels.layers.InMemoryChannelLayer',
+      },
+  }
+
+NAYA (production me Redis use karo WebSocket ke liye):
+  CHANNEL_LAYERS = {
+      'default': {
+          'BACKEND': 'channels_redis.core.RedisChannelLayer',
+          'CONFIG': { 'hosts': [('127.0.0.1', 6379)] },
+      },
+  }
+  NOTE: pip install channels-redis  aur  apt install redis-server
+
+PURANA:
+  STATIC_URL = 'static/'
+  (STATIC_ROOT missing hai)
+
+NAYA (add karo settings.py me):
+  STATIC_ROOT = BASE_DIR / 'staticfiles'
+  STATIC_URL = '/static/'
+  NOTE: python manage.py collectstatic command chalana hoga deploy ke time
+
+----------------------------------------------------------------
+3. FRONTEND — src/services/api.js
+----------------------------------------------------------------
+
+PURANA:
+  const API = axios.create({ baseURL: 'http://localhost:8000/api' });
+
+NAYA:
+  const API = axios.create({ baseURL: 'https://api.teople.com/api' });
+  
+  YA agar alag subdomain nahi hai aur same server pe hai:
+  const API = axios.create({ baseURL: 'https://teople.com/api' });
+
+  BEST PRACTICE — environment variable use karo:
+  const API = axios.create({ baseURL: import.meta.env.VITE_API_URL });
+  
+  Aur .env file banao frontend root me:
+    VITE_API_URL=https://api.teople.com/api
+
+----------------------------------------------------------------
+4. FRONTEND — .env file (FrontEnd19/ root me banao)
+----------------------------------------------------------------
+
+Development (.env.local):
+  VITE_API_URL=http://localhost:8000/api
+
+Production (.env.production):
+  VITE_API_URL=https://api.teople.com/api
+
+----------------------------------------------------------------
+5. FRONTEND — Build karna hoga
+----------------------------------------------------------------
+
+Command:
+  cd FrontEnd19
+  npm run build
+
+Ye /dist folder banayega — isi ko server pe serve karna hai
+Nginx ya Apache se /dist folder serve karo
+
+----------------------------------------------------------------
+6. NGINX CONFIG (agar Nginx use kar rahe ho)
+----------------------------------------------------------------
+
+Frontend serve karne ke liye:
+  server {
+      listen 80;
+      server_name teople.com www.teople.com;
+      root /var/www/teople/dist;
+      index index.html;
+      location / {
+          try_files $uri $uri/ /index.html;   ← React routing ke liye zaroori
+      }
+  }
+
+Backend proxy ke liye:
+  server {
+      listen 80;
+      server_name api.teople.com;
+      location / {
+          proxy_pass http://127.0.0.1:8000;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+      }
+      location /ws/ {
+          proxy_pass http://127.0.0.1:8000;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+      }
+  }
+
+----------------------------------------------------------------
+7. SSL (HTTPS) — Free Certificate
+----------------------------------------------------------------
+
+  apt install certbot python3-certbot-nginx
+  certbot --nginx -d teople.com -d www.teople.com
+  certbot --nginx -d api.teople.com
+
+  NOTE: HTTP se HTTPS karne ke baad .env me bhi https:// karo
+
+----------------------------------------------------------------
+8. BACKEND — Gunicorn/Daphne se run karna hoga
+----------------------------------------------------------------
+
+Development me:
+  python manage.py runserver   ← ye production ke liye nahi hai
+
+Production me (Daphne — WebSocket support ke liye):
+  daphne -b 0.0.0.0 -p 8000 core.asgi_routing:application
+
+  Ya systemd service banao taaki server restart pe auto start ho
+
+----------------------------------------------------------------
+9. DATABASE
+----------------------------------------------------------------
+
+  - MySQL production me bhi same rahega
+  - Sirf DB_PASSWORD strong rakho
+  - DB_HOST localhost hi rahega agar same machine pe hai
+  - Regular backup setup karo:
+    mysqldump -u root -p teople > backup.sql
+
+----------------------------------------------------------------
+SUMMARY TABLE — Kya Kya Badlega
+----------------------------------------------------------------
+
+FILE                          | KYA BADLEGA
+------------------------------|------------------------------------------
+backend/.env                  | DEBUG, SECRET_KEY, ALLOWED_HOSTS,
+                              | FRONTEND_URL, CORS_ALLOWED_ORIGINS
+backend/core/settings.py      | CHANNEL_LAYERS (Redis), STATIC_ROOT add
+src/services/api.js           | baseURL (localhost → domain)
+src/                          | .env.production file banao
+vite.config.js                | kuch nahi badlega
+npm run build                 | /dist folder generate karo
+Nginx config                  | naya banao
+SSL certificate               | certbot se lagao
+
+----------------------------------------------------------------
+IMPORTANT NOTES
+----------------------------------------------------------------
+
+1. DEBUG=False karne ke baad Django static files serve nahi karta
+   isliye collectstatic + Nginx zaroori hai
+
+2. SECRET_KEY kabhi bhi public mat karo (GitHub pe mat daalo)
+   .gitignore me .env already hai — theek hai
+
+3. CORS_ALLOWED_ORIGINS me sirf apna domain rakho, * mat karo
+
+4. WebSocket (notifications) ke liye Redis + Daphne zaroori hai
+   InMemoryChannelLayer sirf development ke liye hai
+
+================================================================
