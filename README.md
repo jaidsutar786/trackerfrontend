@@ -1,16 +1,78 @@
-# React + Vite
+# Tracker Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite frontend application for the Tracker project management system.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Project management dashboard
+- Task and issue tracking
+- Team collaboration
+- Real-time notifications
+- Analytics and reporting
+- Multi-role support (Admin, Manager, Employee, Client)
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 18
+- Vite
+- Context API for state management
+- WebSocket for real-time updates
+- Chart.js for analytics
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+
+- Node.js 16+
+- npm or yarn
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```
+VITE_API_URL=http://localhost:8000/api
+VITE_WS_URL=ws://localhost:8000
+```
+
+For production (Vercel):
+
+```
+VITE_API_URL=https://your-backend-url.onrender.com/api
+VITE_WS_URL=wss://your-backend-url.onrender.com
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+### Build
+
+```bash
+npm run build
+```
+
+## Deployment
+
+Deployed on Vercel. Connect your GitHub repository to Vercel and set the environment variables.
+
+## Project Structure
+
+```
+src/
+├── components/     # Reusable components
+├── pages/         # Page components
+├── services/      # API services
+├── context/       # React Context
+├── hooks/         # Custom hooks
+├── utils/         # Utility functions
+└── assets/        # Static assets
+```
